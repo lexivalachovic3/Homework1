@@ -1,0 +1,146 @@
+<html>
+<head>
+<title>Lexi Valachovic - anv35</title>
+<h2>Homework 1</h2>
+<h3>INFO 4310</h3>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+
+<style>
+    .gridlines line {
+      stroke: #bbb;
+    }
+
+    .gridlines .domain {
+      stroke: none;
+    }
+
+    .legend {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+    }
+
+    .legend-item {
+            display: flex;
+            align-items: center;
+            margin-right: 10px;
+    }
+
+    .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 5px;
+    }
+</style>
+
+</head>
+
+<body>
+    <svg id="lineplot" height="600" width="900" ></svg>
+
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: blue;"></div>
+            <div>Publicly Owned by DPW</div>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: green;"></div>
+            <div>Privately Owned</div>
+        </div>
+    </div>
+
+    <script>
+        const svg = d3.select("svg#lineplot");
+        const width = svg.attr("width");
+        const height = svg.attr("height");
+        const margin = {top: 10, right: 10, bottom: 50, left: 50};
+        const chartWidth = width - margin.left - margin.right;
+        const chartHeight = height - margin.top - margin.bottom;
+
+        let annotations = svg.append("g").attr("id","annotations");
+        let chartArea = svg.append("g").attr("id","points")
+                        .attr("transform",`translate(${margin.left},${margin.top})`);
+
+
+        const requestData = async function() {
+    
+            const sf = await d3.json("SF-Neighborhoods.geo.json");
+            console.log(sf);
+      
+            const trees = await d3.csv("Street_Tree_List-2022-01-30_FILTERED.csv");
+            //console.log(trees);
+
+            var data = trees.filter(d => { return d["PlantDate"] !== ""; });
+            data.forEach( d => {
+                var dateParts = d["PlantDate"].split(" ");
+                var formattedDate = dateParts[0];
+                d["SlicedDate"] = formattedDate;
+            });
+
+            const timeParser = d3.timeParse('%m/%d/%y');
+            data.forEach( d => {
+                d['date'] = timeParser(d["SlicedDate"]);
+            });
+            console.log(data);
+
+            const sizeExtent = d3.extent(data, d => d["DBH"]);
+            const sizeScale = d3.scaleLinear().domain(sizeExtent).range([chartHeight, 0]);
+            let leftAxis = d3.axisLeft(sizeScale)
+            let leftGridlines = d3.axisLeft(sizeScale)
+                                    .tickSize(-chartWidth-10)
+                                    .tickFormat("")
+            annotations.append("g")
+                .attr("class", "y axis")
+                .attr("transform",`translate(${margin.left-10},${margin.top})`)
+                .call(leftAxis)
+            annotations.append("g")
+                .attr("class", "y gridlines")
+                .attr("transform",`translate(${margin.left-10},${margin.top})`)
+                .call(leftGridlines);
+
+
+            //[Thu Aug 21 1969 00:00:00 GMT-0400 (Eastern Daylight Time), Tue Sep 05 2056 00:00:00 GMT-0400 (Eastern Daylight Time)]
+            // filtered out data with dates pasted current date
+            const today = new Date();
+            const startDate = new Date("1969-08-21"); 
+            const dateExtent = [startDate, today];
+            const dateScale = d3.scaleTime().domain(dateExtent).range([0,chartWidth]);
+            let bottomAxis = d3.axisBottom(dateScale)
+            let bottomGridlines = d3.axisBottom(dateScale)
+                                    .tickSize(-chartHeight-10)
+                                    .tickFormat("")
+            annotations.append("g")
+                .attr("class", "x axis")
+                .attr("transform",`translate(${margin.left},${chartHeight+margin.top+10})`)
+                .call(bottomAxis);
+            
+            annotations.append("g")
+                .attr("class", "x gridlines")
+                .attr("transform",`translate(${margin.left},${chartHeight+margin.top+10})`)
+                .call(bottomGridlines);
+
+            annotations.append("text")
+                        .attr("transform", `translate(${margin.left + chartWidth / 2}, ${height - margin.bottom + 45})`)
+                        .style("text-anchor", "middle")
+                        .text("Date");
+
+            annotations.append("text")
+                       .attr("transform", `translate(${margin.left - 40}, ${margin.top + chartHeight / 2}) rotate(-90)`)
+                       .style("text-anchor", "middle")
+                       .text("Diameter at breast height (DBH)");
+            
+            chartArea.selectAll("circle.point").data(data)
+                     .join("circle").attr("class","point")
+                     .attr("cx", d => dateScale(d['date']))
+                     .attr("cy", d => sizeScale(d['DBH']))
+                     .attr("r", 3)
+                     .attr("opacity", 0.6)
+                     .style("fill", d => {
+                        if(d["qCaretaker"] == "Private") { return "green"} else { return "blue"}
+                     });
+        }
+        requestData();
+        </script>
+    </body>
+</html>
